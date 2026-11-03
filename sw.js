@@ -2,7 +2,7 @@
    ・アプリ本体(index.html)：電波があれば最新を取得、なければ端末に保存した版で起動
    ・アイコン等：端末に保存した版を使用
    ・アプリを更新して配置し直すときは VERSION を変える */
-const VERSION = 'tgrt-timer-v2';
+const VERSION = 'tgrt-timer-v3';
 const FONTS = 'tgrt-timer-fonts';
 const CORE = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './apple-touch-icon.png'];
 
@@ -30,7 +30,8 @@ self.addEventListener('fetch', e => {
       try {
         const ctl = new AbortController();
         const timer = setTimeout(() => ctl.abort(), 4000);
-        const res = await fetch(req, { signal: ctl.signal });
+        // ブラウザの一時保存を使わず、必ずサーバーに最新版を確認する
+        const res = await fetch(req.url, { signal: ctl.signal, cache: 'no-cache', credentials: 'same-origin' });
         clearTimeout(timer);
         if (res.ok) cache.put('./index.html', res.clone());
         return res;
