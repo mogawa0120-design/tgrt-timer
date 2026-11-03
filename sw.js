@@ -2,7 +2,7 @@
    ・アプリ本体(index.html)：電波があれば最新を取得、なければ端末に保存した版で起動
    ・アイコン等：端末に保存した版を使用
    ・アプリを更新して配置し直すときは VERSION を変える */
-const VERSION = 'tgrt-timer-v1';
+const VERSION = 'tgrt-timer-v2';
 const FONTS = 'tgrt-timer-fonts';
 const CORE = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './apple-touch-icon.png'];
 
