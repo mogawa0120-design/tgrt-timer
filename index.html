@@ -408,7 +408,7 @@ input,select{font-size:16px;} /* iPhoneの自動ズーム防止 */
 <script id="data" type="application/json">
 {
   "id": "12H-SE-CHANG-2026",
-  "builtAt": "2026-11-24T22:18:00",
+  "builtAt": "2026-11-24T22:35:00",
   "lang": "auto",
   "title": "2026 12H SUPER ENDURANCE",
   "subtitle": "12H Super Endurance Thailand 2026 · Chang International Circuit, Buriram",
@@ -1374,7 +1374,7 @@ function tick(){
   }
   var ringing = sndCfg.dur==="until" ? inRing : (inRing&&ringEvId===st.ev.id&&t<ringEnd);
   if(sound&&ringing&&!muted&&rem.total>0){
-    if(rem.total!==lastBeepSec){ lastBeepSec=rem.total; initAudio(); playPat(rem.total>60?"warn":"hot"); }
+    if(rem.total!==lastBeepSec){ lastBeepSec=rem.total; initAudio(); playPat("warn"); /* 選んだ音を開始まで同じパターンでくり返す */ }
   } else if(!inRing) lastBeepSec=-1;
   if(inAlarm&&!fired[st.ev.id+":5m"]){ fired[st.ev.id+":5m"]=true; flashTitle("⏰ "+(st.ev.kind==="pit"?"Pit Exit":L.flRun)+" "+L.fl5); }
 
@@ -1691,10 +1691,13 @@ tick();
 
 buildSndPanel();
 $("btnSndCfg").addEventListener("click",function(){ var p=$("sndPanel"), o=!p.classList.contains("open"); p.classList.toggle("open",o); this.className="btn"+(o?" on":""); initAudio(); });
-$("sndSel").addEventListener("change",function(){ sndCfg.id=this.value; saveSndCfg(); initAudio(); playPat("go"); });
+$("sndSel").addEventListener("change",function(){ sndCfg.id=this.value; saveSndCfg(); previewSnd(); });
 $("sndLead").addEventListener("change",function(){ sndCfg.lead=+this.value; saveSndCfg(); });
 $("sndDur").addEventListener("change",function(){ sndCfg.dur=this.value; saveSndCfg(); });
-$("btnSndTry").addEventListener("click",function(){ initAudio(); playPat("warn"); setTimeout(function(){ playPat("hot"); },900); setTimeout(function(){ playPat("go"); },1800); });
+var tryTimers=[];
+function previewSnd(){ initAudio(); tryTimers.forEach(clearTimeout); tryTimers=[];   // 選んだ音を、実際のアラームと同じ1秒間隔で3回くり返す
+  [0,1000,2000].forEach(function(ms){ tryTimers.push(setTimeout(function(){ playPat("warn"); },ms)); }); }
+$("btnSndTry").addEventListener("click",previewSnd);
 setInterval(tick,250);
 syncTime();
 setInterval(syncTime,10*60*1000);
