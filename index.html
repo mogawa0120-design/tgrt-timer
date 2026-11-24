@@ -408,7 +408,7 @@ input,select{font-size:16px;} /* iPhoneの自動ズーム防止 */
 <script id="data" type="application/json">
 {
   "id": "12H-SE-CHANG-2026",
-  "builtAt": "2026-11-24T21:34:00",
+  "builtAt": "2026-11-24T22:18:00",
   "lang": "auto",
   "title": "2026 12H SUPER ENDURANCE",
   "subtitle": "12H Super Endurance Thailand 2026 · Chang International Circuit, Buriram",
@@ -1142,9 +1142,21 @@ function applyData(){ parseData(); buildViews(); fired={}; }
 
 /* ══════════ アラーム音 ══════════ */
 var actx=null;
+var master=null;
 function initAudio(){
-  try{ if(!actx) actx=new (window.AudioContext||window.webkitAudioContext)();
-       if(actx.state==="suspended") actx.resume(); }catch(e){}
+  try{
+    if(!actx){
+      var AC=window.AudioContext||window.webkitAudioContext;
+      // Windows で音が途切れる・バリつくのを防ぐため、余裕のある再生バッファ（playback）で作る
+      try{ actx=new AC({latencyHint:"playback"}); }catch(e1){ actx=new AC(); }
+      // 音割れ防止：全音をリミッター（コンプレッサー）経由で出力
+      var comp=actx.createDynamicsCompressor();
+      comp.threshold.value=-10; comp.knee.value=6; comp.ratio.value=12; comp.attack.value=0.003; comp.release.value=0.15;
+      master=actx.createGain(); master.gain.value=0.9;
+      master.connect(comp); comp.connect(actx.destination);
+    }
+    if(actx.state==="suspended") actx.resume();
+  }catch(e){}
   updateAudioBadge();
 }
 function tone(freq,dur,delay){
@@ -1213,16 +1225,26 @@ var SND_L={
 var sndCfg={id:"beep",lead:300,dur:"until"};
 try{ var _sc=JSON.parse(localStorage.getItem("ogwTimer::snd")||"null"); if(_sc){ if(SOUNDS[_sc.id]) sndCfg.id=_sc.id; if([300,180,120,60].indexOf(+_sc.lead)>=0) sndCfg.lead=+_sc.lead; if(_sc.dur) sndCfg.dur=String(_sc.dur); } }catch(e){}
 function saveSndCfg(){ try{ localStorage.setItem("ogwTimer::snd",JSON.stringify(sndCfg)); }catch(e){} }
+var WAVE_PEAK={square:0.14,sawtooth:0.12,triangle:0.32,sine:0.36};
 function toneW(freq,dur,delay,wave){
   if(!actx) return;
   var start=function(){ try{
-    var o=actx.createOscillator(), g=actx.createGain();
-    o.type=wave||"square"; o.frequency.value=freq;
-    var t0=actx.currentTime+(delay||0);
-    g.gain.setValueAtTime(0.0001,t0);
-    g.gain.exponentialRampToValueAtTime(0.25,t0+0.012);
-    g.gain.exponentialRampToValueAtTime(0.0001,t0+dur);
-    o.connect(g); g.connect(actx.destination); o.start(t0); o.stop(t0+dur+0.03);
+    wave=wave||"square";
+    var o=actx.createOscillator(), g=actx.createGain(), out=g;
+    o.type=wave; o.frequency.value=freq;
+    // 角ばった波形は高い倍音を少し落として耳障り・歪みを抑える
+    if(wave==="square"||wave==="sawtooth"){ var lp=actx.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value=3500; lp.Q.value=0.5; o.connect(lp); lp.connect(g); }
+    else o.connect(g);
+    var pk=WAVE_PEAK[wave]||0.2;
+    var t0=actx.currentTime+0.03+(delay||0);           // 少し先に予約してプチッという音を防ぐ
+    var rel=Math.min(0.06,dur*0.4);
+    g.gain.setValueAtTime(0,t0);
+    g.gain.linearRampToValueAtTime(pk,t0+0.01);         // 立ち上がり
+    g.gain.setValueAtTime(pk,t0+Math.max(0.011,dur-rel));
+    g.gain.linearRampToValueAtTime(0,t0+dur);          // なめらかに消す
+    out.connect(master||actx.destination);
+    o.start(t0); o.stop(t0+dur+0.05);
+    o.onended=function(){ try{ o.disconnect(); g.disconnect(); }catch(e){} };
   }catch(e){} };
   if(actx.state==="suspended"){ actx.resume().then(start).catch(start); } else start();
 }
