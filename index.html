@@ -399,7 +399,7 @@ input,select{font-size:16px;} /* iPhoneの自動ズーム防止 */
 <script id="data" type="application/json">
 {
   "id": "12H-SE-CHANG-2026",
-  "builtAt": "2026-11-24T21:20:00",
+  "builtAt": "2026-11-24T21:22:00",
   "lang": "auto",
   "title": "2026 12H SUPER ENDURANCE",
   "subtitle": "12H Super Endurance Thailand 2026 · Chang International Circuit, Buriram",
@@ -1252,8 +1252,7 @@ function tick(){
 
   $("clocktz").textContent=L.tz+" · UTC+"+tzOff();
   $("clock").innerHTML=dcell(pad(z.getUTCHours()))+":"+dcell(pad(z.getUTCMinutes()))+"<small>:"+dcell(pad(z.getUTCSeconds()))+"</small>";
-  $("clockday").innerHTML=(sim?"SIM · ":"")+esc(L.dow[z.getUTCDay()])+" "+dmLabel(z.getUTCMonth(),z.getUTCDate())+
-    ' · <b>'+esc(L.home)+' '+pad(hz.getUTCHours())+":"+pad(hz.getUTCMinutes())+'</b>';
+  $("clockday").innerHTML=(sim?"SIM · ":"")+esc(L.dow[z.getUTCDay()])+" "+dmLabel(z.getUTCMonth(),z.getUTCDate());
 
   var rem=null;
   if(st.target){ var s=Math.max(0,Math.floor((st.target.getTime()-t)/1000));
