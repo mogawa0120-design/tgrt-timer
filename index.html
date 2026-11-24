@@ -388,6 +388,15 @@ input,select{font-size:16px;} /* iPhoneの自動ズーム防止 */
 .guide .kbd{display:inline-block;border:1px solid var(--line2);border-radius:3px;padding:0 5px;background:var(--soft);color:var(--txt);font-weight:700;}
 .syncbadge{cursor:pointer;}
 .big .dg,.clocknum .dg{display:inline-block;width:.62em;text-align:center;}
+
+/* ── 音設定パネル ── */
+.sndpanel{flex:1 1 100%;display:none;border:1px solid var(--check);border-radius:4px;background:var(--check-bg);padding:12px 14px;margin-top:2px;}
+.sndpanel.open{display:block;}
+.sndrow{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center;margin-bottom:9px;}
+.sndrow:last-child{margin-bottom:0;}
+.sndrow>label{font-size:12px;font-weight:700;color:var(--dim2);min-width:7.5em;}
+.sndpanel .sndrow select{width:auto;flex:0 1 auto;font:inherit;font-size:13px;padding:7px 28px 7px 9px;border:1px solid var(--line2);border-radius:4px;background:#fff;color:var(--txt);min-width:200px;max-width:100%;}
+.sndnote{font-size:11px;color:var(--dim2);line-height:1.6;}
 .logo{height:24px;}@media (max-width:380px){.logo{height:20px;}}
 </style>
 </head>
@@ -399,7 +408,7 @@ input,select{font-size:16px;} /* iPhoneの自動ズーム防止 */
 <script id="data" type="application/json">
 {
   "id": "12H-SE-CHANG-2026",
-  "builtAt": "2026-11-24T21:28:00",
+  "builtAt": "2026-11-24T21:34:00",
   "lang": "auto",
   "title": "2026 12H SUPER ENDURANCE",
   "subtitle": "12H Super Endurance Thailand 2026 · Chang International Circuit, Buriram",
@@ -732,6 +741,7 @@ input,select{font-size:16px;} /* iPhoneの自動ズーム防止 */
       </div>
       <button class="btn" id="btnSound"></button>
       <button class="btn test" id="btnTest"></button>
+      <button class="btn" id="btnSndCfg"></button>
       <button class="btn" id="btnWake"></button>
       <span class="audiobadge" id="audioBadge"></span>
       <span class="tzbadge" id="tzBadge"></span>
@@ -740,6 +750,12 @@ input,select{font-size:16px;} /* iPhoneの自動ズーム防止 */
       <button class="btn" id="btnEdit"></button>
       <input class="slider" type="range" id="slider" aria-label="time scrub">
       <span class="hint" id="hint"></span>
+      <div class="sndpanel" id="sndPanel">
+        <div class="sndrow"><label id="sndLType"></label><select id="sndSel"></select><button class="btn test" id="btnSndTry"></button></div>
+        <div class="sndrow"><label id="sndLLead"></label><select id="sndLead"></select></div>
+        <div class="sndrow"><label id="sndLDur"></label><select id="sndDur"></select></div>
+        <div class="sndnote" id="sndNote"></div>
+      </div>
       <div class="verline"><span id="verLine"></span><span class="netbadge" id="netBadge"></span></div>
     </div>
 
@@ -1146,9 +1162,7 @@ function tone(freq,dur,delay){
 }
 function beepSeq(f,d,n){ for(var i=0;i<n;i++) tone(f,d,i*(d+0.09)); }
 function fireAlert(kind, ev){
-  if(kind==="5m") beepSeq(660,0.12,2);
-  else if(kind==="1m") beepSeq(880,0.12,3);
-  else beepSeq(1320,0.3,1);
+  playPat(kind==="5m"?"warn":kind==="1m"?"hot":"go");
   var cd=$("cd"); cd.classList.remove("flash"); void cd.offsetWidth; cd.classList.add("flash");
   try{ if(navigator.vibrate) navigator.vibrate(kind==="go"?[200,80,200]:[120]); }catch(e){}
   var what = ev&&ev.kind==="pit" ? "Pit Exit" : L.flRun;
@@ -1169,6 +1183,64 @@ function updateAudioBadge(){
 }
 document.addEventListener("visibilitychange",function(){ if(!document.hidden&&actx) actx.resume().then(updateAudioBadge).catch(function(){}); });
 ["click","keydown","touchstart"].forEach(function(ev){ window.addEventListener(ev,function once(){ initAudio(); window.removeEventListener(ev,once); },{once:true}); });
+
+/* ══════════ 音の種類・鳴らす時間の設定（SF版と同様に選択可能）══════════ */
+var SOUNDS={
+  beep:  {w:"square",  warn:[[880,180]],          hot:[[1175,100],[1175,100]],        go:[[1320,300]]},
+  pippi: {w:"square",  warn:[[1000,90],[1000,90]], hot:[[1400,70],[1400,70],[1400,70]], go:[[1600,230],[2000,200]]},
+  chime: {w:"sine",    warn:[[784,180],[659,230]], hot:[[784,120],[659,120],[523,180]], go:[[659,200],[784,200],[988,380]]},
+  bell:  {w:"triangle",warn:[[1047,220]],          hot:[[1319,120],[1319,160]],        go:[[1568,440]]},
+  buzzer:{w:"sawtooth",warn:[[220,240]],           hot:[[196,140],[196,140]],          go:[[147,520]]},
+  marimba:{w:"sine",   warn:[[880,110],[1175,160]],hot:[[880,90],[1175,90],[1397,150]],go:[[1175,130],[1397,130],[1760,340]]}
+};
+var SND_L={
+  ja:{btn:"🔊 音設定",type:"アラーム音",lead:"鳴り始め",dur:"鳴らす長さ",tryb:"▶ 試聴",
+      names:{beep:"ビープ（標準）",pippi:"ピッピ（高音）",chime:"チャイム",bell:"ベル",buzzer:"ブザー（低音）",marimba:"マリンバ"},
+      leads:{300:"5分前",180:"3分前",120:"2分前",60:"1分前"},
+      durs:{until:"開始まで鳴らし続ける",once:"1回だけ",3:"3秒間",5:"5秒間",10:"10秒間",20:"20秒間"},
+      note:"「開始まで鳴らし続ける」以外は、鳴り始めの時刻と1分前に、選んだ長さだけ鳴ります。開始の瞬間は全設定で1回鳴ります。赤字点滅（5分前）・赤フラッシュ（1分前）はこの設定に関係なく表示。設定はこの端末に保存されます。"},
+  en:{btn:"🔊 Sound settings",type:"Alarm sound",lead:"Start ringing",dur:"Ring length",tryb:"▶ Preview",
+      names:{beep:"Beep (standard)",pippi:"Pip-pip (high)",chime:"Chime",bell:"Bell",buzzer:"Buzzer (low)",marimba:"Marimba"},
+      leads:{300:"5 min before",180:"3 min before",120:"2 min before",60:"1 min before"},
+      durs:{until:"Keep ringing until start",once:"Once",3:"3 seconds",5:"5 seconds",10:"10 seconds",20:"20 seconds"},
+      note:"Except for “Keep ringing until start”, it rings for the chosen length at the start-ringing time and at 1 min before. One sound plays at the start in every setting. Red blinking (5 min) and red flash (1 min) are shown regardless. Settings are saved on this device."},
+  th:{btn:"🔊 ตั้งค่าเสียง",type:"เสียงเตือน",lead:"เริ่มดัง",dur:"ความยาวเสียง",tryb:"▶ ฟังตัวอย่าง",
+      names:{beep:"บี๊บ (มาตรฐาน)",pippi:"ปิ๊ปปิ๊ป (เสียงสูง)",chime:"ระฆังเบา",bell:"กระดิ่ง",buzzer:"บัซเซอร์ (เสียงต่ำ)",marimba:"มาริมบา"},
+      leads:{300:"ก่อน 5 นาที",180:"ก่อน 3 นาที",120:"ก่อน 2 นาที",60:"ก่อน 1 นาที"},
+      durs:{until:"ดังต่อเนื่องจนเริ่ม",once:"ครั้งเดียว",3:"3 วินาที",5:"5 วินาที",10:"10 วินาที",20:"20 วินาที"},
+      note:"ยกเว้น “ดังต่อเนื่องจนเริ่ม” เสียงจะดังตามความยาวที่เลือก ณ เวลาเริ่มดังและก่อน 1 นาที เมื่อเซสชันเริ่มจะมีเสียงดัง 1 ครั้งทุกการตั้งค่า ตัวเลขแดงกะพริบ (5 นาที) และกรอบแดง (1 นาที) แสดงเสมอ การตั้งค่าบันทึกไว้ในเครื่องนี้"}
+};
+var sndCfg={id:"beep",lead:300,dur:"until"};
+try{ var _sc=JSON.parse(localStorage.getItem("ogwTimer::snd")||"null"); if(_sc){ if(SOUNDS[_sc.id]) sndCfg.id=_sc.id; if([300,180,120,60].indexOf(+_sc.lead)>=0) sndCfg.lead=+_sc.lead; if(_sc.dur) sndCfg.dur=String(_sc.dur); } }catch(e){}
+function saveSndCfg(){ try{ localStorage.setItem("ogwTimer::snd",JSON.stringify(sndCfg)); }catch(e){} }
+function toneW(freq,dur,delay,wave){
+  if(!actx) return;
+  var start=function(){ try{
+    var o=actx.createOscillator(), g=actx.createGain();
+    o.type=wave||"square"; o.frequency.value=freq;
+    var t0=actx.currentTime+(delay||0);
+    g.gain.setValueAtTime(0.0001,t0);
+    g.gain.exponentialRampToValueAtTime(0.25,t0+0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001,t0+dur);
+    o.connect(g); g.connect(actx.destination); o.start(t0); o.stop(t0+dur+0.03);
+  }catch(e){} };
+  if(actx.state==="suspended"){ actx.resume().then(start).catch(start); } else start();
+}
+function playPat(tier,id){
+  var s=SOUNDS[id||sndCfg.id]||SOUNDS.beep, notes=s[tier]||s.go, d=0;
+  notes.forEach(function(n){ toneW(n[0],n[1]/1000,d,s.w); d+=n[1]/1000+0.07; });
+}
+var sndLangShown=null;
+function buildSndPanel(){
+  var S=SND_L[LANG]||SND_L.en; sndLangShown=LANG;
+  $("btnSndCfg").textContent=S.btn; $("sndLType").textContent=S.type; $("sndLLead").textContent=S.lead; $("sndLDur").textContent=S.dur;
+  $("btnSndTry").textContent=S.tryb; $("sndNote").textContent=S.note;
+  function fill(sel,map,keys,cur){ sel.innerHTML=""; keys.forEach(function(k){ var o=document.createElement("option"); o.value=k; o.textContent=map[k]; if(String(k)===String(cur)) o.selected=true; sel.appendChild(o); }); }
+  fill($("sndSel"),S.names,Object.keys(SOUNDS),sndCfg.id);
+  fill($("sndLead"),S.leads,["300","180","120","60"],sndCfg.lead);
+  fill($("sndDur"),S.durs,["until","once","3","5","10","20"],sndCfg.dur);
+}
+var ringEnd=0, ringEvId=null;
 
 /* ══════════ 状態判定 ══════════ */
 var sim=false, simMs=0, sound=true, fired={}, editing=false, mutedId=null, lastBeepSec=-1;
@@ -1268,11 +1340,20 @@ function tick(){
   var cd=$("cd"), hadFlash=cd.classList.contains("flash");
   cd.className="cd"+(st.phase==="live"?" live":"")+(st.phase==="done"?" done":"")+(alertLv?" "+alertLv:"")+(armed?" armed":"")+(hadFlash?" flash":"");
   var mb=$("btnMute"); mb.textContent=muted?L.unmute:L.mute; mb.className="mutebtn"+(muted?" muted":"");
-  /* 5分前〜開始まで 毎秒鳴らし続ける（最後の1分は速い2連音） */
-  if(armed&&!muted&&rem.total>0){
-    if(rem.total!==lastBeepSec){ lastBeepSec=rem.total;
-      if(rem.total>60) tone(880,0.18,0); else beepSeq(1175,0.1,2); }
-  } else if(!inAlarm) lastBeepSec=-1;
+  /* アラーム音：音設定（種類・鳴り始め・長さ）に従って鳴らす。最後の1分は速いパターン */
+  if(sndLangShown!==LANG) buildSndPanel();
+  var inRing=!!(st.phase==="wait"&&rem&&st.ev&&rem.total<=sndCfg.lead);
+  if(sound&&inRing&&sndCfg.dur!=="until"){
+    [[sndCfg.lead,"s1"],[60,"s2"]].forEach(function(mk){
+      var key=st.ev.id+":"+mk[1];
+      if(mk[0]<=sndCfg.lead&&rem.total<=mk[0]&&rem.total>mk[0]-30&&!fired[key]){ fired[key]=true;
+        ringEvId=st.ev.id; ringEnd=t+(sndCfg.dur==="once"?500:(+sndCfg.dur)*1000); lastBeepSec=-1; }
+    });
+  }
+  var ringing = sndCfg.dur==="until" ? inRing : (inRing&&ringEvId===st.ev.id&&t<ringEnd);
+  if(sound&&ringing&&!muted&&rem.total>0){
+    if(rem.total!==lastBeepSec){ lastBeepSec=rem.total; initAudio(); playPat(rem.total>60?"warn":"hot"); }
+  } else if(!inRing) lastBeepSec=-1;
   if(inAlarm&&!fired[st.ev.id+":5m"]){ fired[st.ev.id+":5m"]=true; flashTitle("⏰ "+(st.ev.kind==="pit"?"Pit Exit":L.flRun)+" "+L.fl5); }
 
   $("cdlabel").textContent=st.label;
@@ -1478,7 +1559,7 @@ $("cd").addEventListener("animationend",function(e){ if(e.animationName==="flash
 });
 $("btnSound").addEventListener("click",function(){
   sound=!sound; this.textContent=sound?L.soundOn:L.soundOff; this.className="btn"+(sound?" on":"");
-  initAudio(); if(sound) beepSeq(880,0.1,1);
+  initAudio(); if(sound) playPat("warn");
 });
 $("btnTest").addEventListener("click",function(){ initAudio(); fireAlert("go"); });
 $("btnMute").addEventListener("click",function(){
@@ -1585,6 +1666,13 @@ applyData();
 syncSlider();
 reqWake();
 tick();
+
+buildSndPanel();
+$("btnSndCfg").addEventListener("click",function(){ var p=$("sndPanel"), o=!p.classList.contains("open"); p.classList.toggle("open",o); this.className="btn"+(o?" on":""); initAudio(); });
+$("sndSel").addEventListener("change",function(){ sndCfg.id=this.value; saveSndCfg(); initAudio(); playPat("go"); });
+$("sndLead").addEventListener("change",function(){ sndCfg.lead=+this.value; saveSndCfg(); });
+$("sndDur").addEventListener("change",function(){ sndCfg.dur=this.value; saveSndCfg(); });
+$("btnSndTry").addEventListener("click",function(){ initAudio(); playPat("warn"); setTimeout(function(){ playPat("hot"); },900); setTimeout(function(){ playPat("go"); },1800); });
 setInterval(tick,250);
 syncTime();
 setInterval(syncTime,10*60*1000);
