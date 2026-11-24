@@ -399,7 +399,7 @@ input,select{font-size:16px;} /* iPhoneの自動ズーム防止 */
 <script id="data" type="application/json">
 {
   "id": "12H-SE-CHANG-2026",
-  "builtAt": "2026-11-24T21:22:00",
+  "builtAt": "2026-11-24T21:28:00",
   "lang": "auto",
   "title": "2026 12H SUPER ENDURANCE",
   "subtitle": "12H Super Endurance Thailand 2026 · Chang International Circuit, Buriram",
@@ -1229,18 +1229,22 @@ function syncTime(){
   var src=[];
   // 1) 公開サーバ（GitHub Pages）の Date ヘッダ
   if(location.protocol==="http:"||location.protocol==="https:") src.push({head:true,url:location.href.split("#")[0]});
-  // 2) 公開時刻API（ファイルで開いたPC版・スマホ版はこちら）
+  // 2) Cloudflare の時刻（ファイルで開いたPC版・スマホ版はこちら。応答が速く安定）
+  var cf=function(x){ var m=/(?:^|\n)ts=([\d.]+)/.exec(x); return m?Math.round(parseFloat(m[1])*1000):NaN; };
+  src.push({url:"https://www.cloudflare.com/cdn-cgi/trace",text:true,parse:cf});
+  src.push({url:"https://1.1.1.1/cdn-cgi/trace",text:true,parse:cf});
+  // 3) 予備の公開時刻API
   src.push({url:"https://timeapi.io/api/time/current/zone?timeZone=UTC",parse:function(j){return Date.UTC(j.year,j.month-1,j.day,j.hour,j.minute,j.seconds||0,j.milliSeconds||0);}});
   src.push({url:"https://worldtimeapi.org/api/timezone/Etc/UTC",parse:function(j){return j.unixtime?j.unixtime*1000:new Date(j.utc_datetime).getTime();}});
   (function tryOne(i){
     if(i>=src.length){ syncing=false; syncState=timeSynced?"ok":(syncState==="cached"?"cached":"fail"); updateSyncBadge(); return; }
     var s=src[i], t0=Date.now();
-    var ctl=("AbortController" in window)?new AbortController():null; var to=setTimeout(function(){ if(ctl) ctl.abort(); },6000);
+    var ctl=("AbortController" in window)?new AbortController():null; var to=setTimeout(function(){ if(ctl) ctl.abort(); },4000);
     var opt=s.head?{method:"HEAD",cache:"no-store"}:{cache:"no-store"}; if(ctl) opt.signal=ctl.signal;
     fetch(s.url,opt).then(function(r){
       var t1=Date.now();
       if(s.head){ var d=r.headers.get("date"); var ms=d?new Date(d).getTime():NaN; if(isNaN(ms)) throw 0; clearTimeout(to); applyOffset(ms,t0,t1); }
-      else { if(!r.ok) throw 0; return r.json().then(function(j){ var ms=s.parse(j); if(isNaN(ms)) throw 0; clearTimeout(to); applyOffset(ms,t0,Date.now()); }); }
+      else { if(!r.ok) throw 0; return (s.text?r.text():r.json()).then(function(j){ var ms=s.parse(j); if(isNaN(ms)) throw 0; clearTimeout(to); applyOffset(ms,t0,Date.now()); }); }
     }).catch(function(){ clearTimeout(to); tryOne(i+1); });
   })(0);
 }
